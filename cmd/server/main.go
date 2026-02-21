@@ -13,39 +13,32 @@ import (
 )
 
 func main() {
-	// 1. Config
 	cfg := config.Load()
 
 	if cfg.JWTSecret == "" {
 		log.Fatal("JWT_SECRET environment variable must be set")
 	}
 
-	// 2. Database
 	database, err := db.Connect(cfg)
 	if err != nil {
 		log.Fatalf("database connection failed: %v", err)
 	}
 	defer database.Close()
 
-	// 3. Migrations
 	if err := db.RunMigrations(database); err != nil {
 		log.Fatalf("migrations failed: %v", err)
 	}
 
-	// 4. Repositories
 	accountRepo := repository.NewAccountRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	metricRepo := repository.NewMetricRepository(database)
 
-	// 5. Handlers
 	authHandler := handler.NewAuthHandler(cfg.JWTSecret, accountRepo)
 	userHandler := handler.NewUserHandler(userRepo)
 	metricHandler := handler.NewMetricHandler(metricRepo)
 
-	// 6. Router
 	r := mux.NewRouter()
 
-	// Global: request body size limit (1 MB)
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -53,7 +46,6 @@ func main() {
 		})
 	})
 
-	// Health check (API key gerektirmez)
 	r.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -62,14 +54,11 @@ func main() {
 
 	api := r.PathPrefix("/api/v1").Subrouter()
 
-	// API Key middleware — tüm route'lara uygulanır
 	api.Use(middleware.APIKeyMiddleware(cfg.APIKey))
 
-	// Public routes
 	api.HandleFunc("/auth/register", authHandler.Register).Methods(http.MethodPost)
 	api.HandleFunc("/auth/login", authHandler.Login).Methods(http.MethodPost)
 
-	// Protected routes — JWT middleware
 	protected := api.NewRoute().Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
