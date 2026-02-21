@@ -9,6 +9,7 @@ type Config struct {
 	DBPassword string
 	DBName     string
 	JWTSecret  string
+	APIKey     string
 	Port       string
 }
 
@@ -20,6 +21,7 @@ func Load() *Config {
 		DBPassword: getEnv("DB_PASSWORD", "bodymetrics_pass"),
 		DBName:     getEnv("DB_NAME", "bodymetrics"),
 		JWTSecret:  getEnv("JWT_SECRET", "change-me-in-production"),
+		APIKey:     getEnv("API_KEY", ""),
 		Port:       getEnv("PORT", "8080"),
 	}
 }
