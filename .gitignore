@@ -23,3 +23,9 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# TOML
+*.toml
+
+# Codex
+.codex/
