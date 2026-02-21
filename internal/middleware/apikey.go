@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
 )
 
@@ -20,7 +21,7 @@ func APIKeyMiddleware(apiKey string) func(http.Handler) http.Handler {
 				return
 			}
 
-			if key != apiKey {
+			if subtle.ConstantTimeCompare([]byte(key), []byte(apiKey)) != 1 {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				w.Write([]byte(`{"error":"invalid API key"}`))

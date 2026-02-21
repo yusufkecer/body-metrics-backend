@@ -37,6 +37,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "email and password are required")
 		return
 	}
+	if !strings.Contains(email, "@") || strings.Index(email, "@") == 0 || !strings.Contains(email[strings.Index(email, "@"):], ".") {
+		writeError(w, http.StatusBadRequest, "invalid email format")
+		return
+	}
 	if len(req.Password) < 6 {
 		writeError(w, http.StatusBadRequest, "password must be at least 6 characters")
 		return
@@ -81,6 +85,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 	if email == "" || req.Password == "" {
 		writeError(w, http.StatusBadRequest, "email and password are required")
+		return
+	}
+	if !strings.Contains(email, "@") || strings.Index(email, "@") == 0 || !strings.Contains(email[strings.Index(email, "@"):], ".") {
+		writeError(w, http.StatusBadRequest, "invalid email format")
 		return
 	}
 

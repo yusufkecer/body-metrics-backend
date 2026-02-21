@@ -20,7 +20,7 @@ func Load() *Config {
 		DBUser:     getEnv("DB_USER", "bodymetrics"),
 		DBPassword: getEnv("DB_PASSWORD", "bodymetrics_pass"),
 		DBName:     getEnv("DB_NAME", "bodymetrics"),
-		JWTSecret:  getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTSecret:  getEnv("JWT_SECRET", ""),
 		APIKey:     getEnv("API_KEY", ""),
 		Port:       getEnv("PORT", "8080"),
 	}
