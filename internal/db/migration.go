@@ -14,6 +14,17 @@ type migration struct {
 
 var migrations = []migration{
 	{
+		version: "000_create_accounts",
+		sql: `
+			CREATE TABLE IF NOT EXISTS accounts (
+				id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+				email         VARCHAR(255) NOT NULL UNIQUE,
+				password_hash VARCHAR(255) NOT NULL,
+				created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+			)`,
+	},
+	{
 		version: "001_create_users",
 		sql: `
 			CREATE TABLE IF NOT EXISTS users (

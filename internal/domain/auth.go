@@ -1,7 +1,8 @@
 package domain
 
 type TokenRequest struct {
-	DeviceID string `json:"device_id"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type TokenResponse struct {

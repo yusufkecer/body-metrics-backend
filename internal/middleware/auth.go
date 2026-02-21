@@ -11,13 +11,14 @@ import (
 
 type contextKey string
 
-const DeviceIDKey contextKey = "device_id"
+const AccountIDKey contextKey = "account_id"
 
-func GenerateToken(deviceID, secret string) (string, error) {
+func GenerateToken(accountID int64, email, secret string) (string, error) {
 	claims := jwt.MapClaims{
-		"device_id": deviceID,
-		"exp":       time.Now().Add(30 * 24 * time.Hour).Unix(),
-		"iat":       time.Now().Unix(),
+		"account_id": accountID,
+		"email":      email,
+		"exp":        time.Now().Add(30 * 24 * time.Hour).Unix(),
+		"iat":        time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
@@ -55,8 +56,13 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			deviceID, _ := claims["device_id"].(string)
-			ctx := context.WithValue(r.Context(), DeviceIDKey, deviceID)
+			accountIDFloat, ok := claims["account_id"].(float64)
+			if !ok {
+				http.Error(w, `{"error":"invalid account id in token"}`, http.StatusUnauthorized)
+				return
+			}
+			accountID := int64(accountIDFloat)
+			ctx := context.WithValue(r.Context(), AccountIDKey, accountID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

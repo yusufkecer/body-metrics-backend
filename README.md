@@ -35,7 +35,7 @@ body-metrics-backend/
 │   │   ├── user_repo.go           # User CRUD (Create, GetByID, GetAll, Update)
 │   │   └── metric_repo.go         # Metric CRUD (Create, GetByUserID)
 │   ├── handler/
-│   │   ├── auth_handler.go        # POST /auth/token
+│   │   ├── auth_handler.go        # POST /auth/register, POST /auth/login
 │   │   ├── user_handler.go        # /users endpoint'leri
 │   │   ├── metric_handler.go      # /users/:id/metrics endpoint'leri
 │   │   └── response.go            # JSON response helper'ları
@@ -52,7 +52,8 @@ body-metrics-backend/
 
 | Method | Path | Auth | Açıklama |
 |--------|------|------|----------|
-| `POST` | `/api/v1/auth/token` | - | Device ID ile JWT token al |
+| `POST` | `/api/v1/auth/register` | - | E-posta ve şifre ile hesap oluştur |
+| `POST` | `/api/v1/auth/login` | - | E-posta ve şifre ile giriş yap |
 | `POST` | `/api/v1/users` | JWT | Yeni kullanıcı oluştur |
 | `GET` | `/api/v1/users` | JWT | Tüm kullanıcıları listele |
 | `GET` | `/api/v1/users/:id` | JWT | Kullanıcı detayı |
@@ -113,11 +114,10 @@ go run ./cmd/server
 
 ## Auth Akışı
 
-1. Flutter uygulaması ilk açılışta UUID device ID oluşturur
-2. `POST /auth/token` ile JWT token alır
-3. Sonraki tüm isteklerde `Authorization: Bearer <token>` header'ı gönderir
+1. Flutter uygulaması `POST /auth/register` ile hesap açar veya `POST /auth/login` ile giriş yapar
+2. API JWT token döner
+3. Sonraki tüm isteklerde `Authorization: Bearer <token>` header'ı gönderilir
 4. Token süresi: 30 gün
-5. 401 hatası alınırsa otomatik yeniden auth yapılır
 
 ## Migration Sistemi
 
