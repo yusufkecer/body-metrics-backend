@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/yusufkecer/body-metrics-backend/internal/config"
@@ -10,6 +11,7 @@ import (
 	"github.com/yusufkecer/body-metrics-backend/internal/handler"
 	"github.com/yusufkecer/body-metrics-backend/internal/middleware"
 	"github.com/yusufkecer/body-metrics-backend/internal/repository"
+	"github.com/yusufkecer/body-metrics-backend/internal/service"
 )
 
 func main() {
@@ -32,13 +34,29 @@ func main() {
 	accountRepo := repository.NewAccountRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	metricRepo := repository.NewMetricRepository(database)
+	resetTokenRepo := repository.NewResetTokenRepository(database)
 
-	authHandler := handler.NewAuthHandler(cfg.JWTSecret, accountRepo)
+	emailService := service.NewEmailService(
+		cfg.SMTPHost,
+		cfg.SMTPPort,
+		cfg.SMTPUser,
+		cfg.SMTPPass,
+		cfg.SMTPFrom,
+	)
+
+	authHandler := handler.NewAuthHandler(cfg.JWTSecret, accountRepo, resetTokenRepo, emailService)
 	userHandler := handler.NewUserHandler(userRepo)
 	metricHandler := handler.NewMetricHandler(metricRepo)
 
+	// Rate limiters
+	loginRL := middleware.NewRateLimiter(5, 15*time.Minute)
+	forgotPasswordRL := middleware.NewRateLimiter(3, 60*time.Minute)
+
 	r := mux.NewRouter()
 
+	// Global middleware: CORS → Security Headers → MaxBytesReader
+	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
+	r.Use(middleware.SecurityHeaders)
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -50,26 +68,27 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
-	}).Methods(http.MethodGet)
+	}).Methods(http.MethodGet, http.MethodOptions)
 
 	api := r.PathPrefix("/api/v1").Subrouter()
 
 	api.Use(middleware.APIKeyMiddleware(cfg.APIKey))
 
-	api.HandleFunc("/auth/register", authHandler.Register).Methods(http.MethodPost)
-	api.HandleFunc("/auth/login", authHandler.Login).Methods(http.MethodPost)
+	api.Handle("/auth/register", http.HandlerFunc(authHandler.Register)).Methods(http.MethodPost, http.MethodOptions)
+	api.Handle("/auth/login", loginRL.Middleware(http.HandlerFunc(authHandler.Login))).Methods(http.MethodPost, http.MethodOptions)
+	api.Handle("/auth/forgot-password", forgotPasswordRL.Middleware(http.HandlerFunc(authHandler.ForgotPassword))).Methods(http.MethodPost, http.MethodOptions)
+	api.Handle("/auth/reset-password", http.HandlerFunc(authHandler.ResetPassword)).Methods(http.MethodPost, http.MethodOptions)
 
 	protected := api.NewRoute().Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
-	protected.HandleFunc("/users", userHandler.Create).Methods(http.MethodPost)
-	protected.HandleFunc("/users", userHandler.GetAll).Methods(http.MethodGet)
-	protected.HandleFunc("/users/{id}", userHandler.GetByID).Methods(http.MethodGet)
-	protected.HandleFunc("/users/{id}", userHandler.Update).Methods(http.MethodPatch)
-	protected.HandleFunc("/users/{id}/metrics", metricHandler.Create).Methods(http.MethodPost)
-	protected.HandleFunc("/users/{id}/metrics", metricHandler.GetByUserID).Methods(http.MethodGet)
+	protected.HandleFunc("/users", userHandler.Create).Methods(http.MethodPost, http.MethodOptions)
+	protected.HandleFunc("/users", userHandler.GetAll).Methods(http.MethodGet, http.MethodOptions)
+	protected.HandleFunc("/users/{id}", userHandler.GetByID).Methods(http.MethodGet, http.MethodOptions)
+	protected.HandleFunc("/users/{id}", userHandler.Update).Methods(http.MethodPatch, http.MethodOptions)
+	protected.HandleFunc("/users/{id}/metrics", metricHandler.Create).Methods(http.MethodPost, http.MethodOptions)
+	protected.HandleFunc("/users/{id}/metrics", metricHandler.GetByUserID).Methods(http.MethodGet, http.MethodOptions)
 
-	// 7. Server
 	addr := ":" + cfg.Port
 	log.Printf("server starting on %s", addr)
 	if err := http.ListenAndServe(addr, r); err != nil {

@@ -55,6 +55,19 @@ var migrations = []migration{
 				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 			)`,
 	},
+	{
+		version: "003_create_password_reset_tokens",
+		sql: `
+			CREATE TABLE IF NOT EXISTS password_reset_tokens (
+				id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+				account_id BIGINT UNSIGNED NOT NULL,
+				token      VARCHAR(6) NOT NULL,
+				expires_at DATETIME NOT NULL,
+				used       TINYINT(1) DEFAULT 0,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+			)`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

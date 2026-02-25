@@ -48,3 +48,14 @@ func (r *AccountRepository) GetByEmail(email string) (*Account, error) {
 	}
 	return &account, nil
 }
+
+func (r *AccountRepository) UpdatePassword(accountID int64, passwordHash string) error {
+	_, err := r.db.Exec(
+		`UPDATE accounts SET password_hash = ? WHERE id = ?`,
+		passwordHash, accountID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	return nil
+}
