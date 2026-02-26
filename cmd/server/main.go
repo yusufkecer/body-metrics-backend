@@ -36,6 +36,9 @@ func main() {
 	metricRepo := repository.NewMetricRepository(database)
 	resetTokenRepo := repository.NewResetTokenRepository(database)
 
+	log.Printf("SMTP config — host:%s port:%s user:%s from:%q pass_set:%v",
+		cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPFrom, cfg.SMTPPass != "")
+
 	emailService := service.NewEmailService(
 		cfg.SMTPHost,
 		cfg.SMTPPort,
@@ -48,13 +51,11 @@ func main() {
 	userHandler := handler.NewUserHandler(userRepo)
 	metricHandler := handler.NewMetricHandler(metricRepo)
 
-	// Rate limiters
 	loginRL := middleware.NewRateLimiter(5, 15*time.Minute)
 	forgotPasswordRL := middleware.NewRateLimiter(3, 60*time.Minute)
 
 	r := mux.NewRouter()
 
-	// Global middleware: CORS → Security Headers → MaxBytesReader
 	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
 	r.Use(middleware.SecurityHeaders)
 	r.Use(func(next http.Handler) http.Handler {

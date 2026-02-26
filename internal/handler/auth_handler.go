@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -136,35 +137,44 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req domain.ForgotPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// Always return 200 to prevent email enumeration
 		writeJSON(w, http.StatusOK, map[string]string{"message": "if the email exists, a code has been sent"})
 		return
 	}
 
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 
-	// Always return OK regardless of whether the email exists
 	go func() {
 		account, err := h.repo.GetByEmail(email)
-		if err != nil || account == nil {
+		if err != nil {
+			log.Printf("[forgot-password] db error looking up %s: %v", email, err)
+			return
+		}
+		if account == nil {
 			return
 		}
 
-		// Delete all existing tokens for this account
-		_ = h.resetTokenRepo.DeleteExpiredByAccountID(account.ID)
+		if err := h.resetTokenRepo.DeleteExpiredByAccountID(account.ID); err != nil {
+			log.Printf("[forgot-password] failed to delete old tokens for account %d: %v", account.ID, err)
+		}
 
-		// Generate 6-digit OTP
 		otp, err := generateOTP()
 		if err != nil {
+			log.Printf("[forgot-password] failed to generate OTP: %v", err)
 			return
 		}
 
 		expiresAt := time.Now().Add(15 * time.Minute)
 		if err := h.resetTokenRepo.Create(account.ID, otp, expiresAt); err != nil {
+			log.Printf("[forgot-password] failed to save reset token for account %d: %v", account.ID, err)
 			return
 		}
 
-		_ = h.emailService.SendPasswordReset(email, otp)
+		log.Printf("[forgot-password] sending reset email to %s", email)
+		if err := h.emailService.SendPasswordReset(email, otp); err != nil {
+			log.Printf("[forgot-password] SMTP error sending to %s: %v", email, err)
+			return
+		}
+		log.Printf("[forgot-password] reset email sent successfully to %s", email)
 	}()
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "if the email exists, a code has been sent"})
@@ -208,9 +218,8 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.resetTokenRepo.MarkUsed(resetToken.ID); err != nil {
-		// Non-critical error — password was already updated
-	}
+	// if err := h.resetTokenRepo.MarkUsed(resetToken.ID); err != nil {
+	// }
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password reset successful"})
 }
