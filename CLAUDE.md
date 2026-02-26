@@ -8,7 +8,7 @@
 
 REST API backend for the BodyMetrics Flutter app. Written in Go, uses MySQL for persistent storage, deployed via Docker. Provides:
 - JWT-based authentication (register/login)
-- Password reset via 6-digit OTP over Gmail SMTP
+- Password reset via 6-digit OTP over Resend HTTP API
 - API key validation for app-level security
 - Rate limiting + security headers + CORS
 - User profile CRUD
@@ -27,7 +27,7 @@ body-metrics-backend/
 │       └── main.go                 # Entry point: config → DB → migrations → repos → handlers → router → serve
 ├── internal/
 │   ├── config/
-│   │   └── config.go              # Environment variable loading (DB, JWT, SMTP, CORS)
+│   │   └── config.go              # Environment variable loading (DB, JWT, Resend, CORS)
 │   ├── db/
 │   │   ├── mysql.go               # Connection pool (25 open, 5 idle, 5min lifetime)
 │   │   └── migration.go           # Versioned, transactional migrations
@@ -52,7 +52,7 @@ body-metrics-backend/
 │   │   ├── metric_repo.go         # Metric CRUD (Create, GetByUserID)
 │   │   └── reset_token_repo.go    # PasswordResetToken CRUD
 │   └── service/
-│       └── email_service.go       # SMTP email sender (Gmail STARTTLS, net/smtp)
+│       └── email_service.go       # Resend HTTP API email sender
 ├── Dockerfile                      # Multi-stage: golang:1.23-alpine → alpine:3.20
 ├── docker-compose.yml              # MySQL + API + PhpMyAdmin
 ├── .env / .env.example            # Environment configuration
@@ -145,7 +145,7 @@ Request → CORSMiddleware → SecurityHeaders → MaxBytesReader(1MB) → APIKe
 ### Password Reset Flow
 1. Client sends `POST /auth/forgot-password` with `{"email": "..."}`
 2. Server always returns `200 OK` (anti-enumeration)
-3. In background goroutine: find account → delete old tokens → generate 6-digit OTP (`crypto/rand`) → save with 15-min expiry → send email via SMTP
+3. In background goroutine: find account → delete old tokens → generate 6-digit OTP (`crypto/rand`) → save with 15-min expiry → send email via Resend HTTP API
 4. Client sends `POST /auth/reset-password` with `{"email", "token", "password"}`
 5. Server validates token (unused + not expired + correct email JOIN) → bcrypt new password → update account → mark token used
 
@@ -257,11 +257,8 @@ File: `internal/db/migration.go`
 | `JWT_SECRET` | `change-me-in-production` | JWT signing secret |
 | `API_KEY` | — | API key for app-level auth (empty = disabled) |
 | `PORT` | `8080` | API server port |
-| `SMTP_HOST` | `smtp.gmail.com` | SMTP server hostname |
-| `SMTP_PORT` | `587` | SMTP port (STARTTLS) |
-| `SMTP_USER` | — | Gmail address |
-| `SMTP_PASS` | — | Gmail App Password |
-| `SMTP_FROM` | — | Display name + address, e.g. `BodyMetrics <addr>` |
+| `RESEND_API_KEY` | — | Resend API key for email sending |
+| `EMAIL_FROM` | `BodyMetrics <onboarding@resend.dev>` | Sender name + address |
 | `ALLOWED_ORIGINS` | `*` | CORS allowed origins (comma-separated or `*`) |
 
 ---
@@ -356,10 +353,10 @@ docker compose down -v
 4. Check firewall allows port 8080
 
 ### "Forgot password email not arriving"
-1. Verify `SMTP_USER` and `SMTP_PASS` are set correctly
-2. Gmail requires an **App Password** (not your account password) — enable in Google Account → Security → 2-Step Verification → App Passwords
-3. Check server logs for SMTP errors
-4. Ensure `SMTP_FROM` is set (required by many SMTP servers)
+1. Verify `RESEND_API_KEY` is set correctly in environment
+2. Check server logs for `[forgot-password] email error` lines
+3. Ensure `EMAIL_FROM` domain is verified in Resend dashboard (or use `onboarding@resend.dev` for testing)
+4. Without a verified domain, emails can only be sent to the Resend account's registered email
 
 ### "429 Too Many Requests"
 1. Rate limit hit: login (5/15min) or forgot-password (3/hr) per IP
@@ -376,6 +373,6 @@ docker compose down -v
 | golang-jwt/jwt | 5.2.1 | JWT auth (HS256) |
 | go-sql-driver/mysql | 1.8.1 | MySQL driver |
 | golang.org/x/crypto | 0.41.0 | bcrypt password hashing |
-| net/smtp | stdlib | Email sending (STARTTLS/TLS) |
+| net/http | stdlib | Resend HTTP API email sending |
 | crypto/rand | stdlib | Secure OTP generation |
 | sync | stdlib | Rate limiter (sync.Map) |

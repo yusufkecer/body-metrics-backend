@@ -36,16 +36,9 @@ func main() {
 	metricRepo := repository.NewMetricRepository(database)
 	resetTokenRepo := repository.NewResetTokenRepository(database)
 
-	log.Printf("SMTP config — host:%s port:%s user:%s from:%q pass_set:%v",
-		cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPFrom, cfg.SMTPPass != "")
+	log.Printf("email config — from:%q resend_key_set:%v", cfg.EmailFrom, cfg.ResendAPIKey != "")
 
-	emailService := service.NewEmailService(
-		cfg.SMTPHost,
-		cfg.SMTPPort,
-		cfg.SMTPUser,
-		cfg.SMTPPass,
-		cfg.SMTPFrom,
-	)
+	emailService := service.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 
 	authHandler := handler.NewAuthHandler(cfg.JWTSecret, accountRepo, resetTokenRepo, emailService)
 	userHandler := handler.NewUserHandler(userRepo)

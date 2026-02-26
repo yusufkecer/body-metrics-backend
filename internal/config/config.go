@@ -11,11 +11,8 @@ type Config struct {
 	JWTSecret      string
 	APIKey         string
 	Port           string
-	SMTPHost       string
-	SMTPPort       string
-	SMTPUser       string
-	SMTPPass       string
-	SMTPFrom       string
+	ResendAPIKey   string
+	EmailFrom      string
 	AllowedOrigins string
 }
 
@@ -29,11 +26,8 @@ func Load() *Config {
 		JWTSecret:      getEnv("JWT_SECRET", ""),
 		APIKey:         getEnv("API_KEY", ""),
 		Port:           getEnv("PORT", "8080"),
-		SMTPHost:       getEnv("SMTP_HOST", "smtp.gmail.com"),
-		SMTPPort:       getEnv("SMTP_PORT", "587"),
-		SMTPUser:       getEnv("SMTP_USER", ""),
-		SMTPPass:       getEnv("SMTP_PASS", ""),
-		SMTPFrom:       getEnv("SMTP_FROM", ""),
+		ResendAPIKey:   getEnv("RESEND_API_KEY", ""),
+		EmailFrom:      getEnv("EMAIL_FROM", "BodyMetrics <onboarding@resend.dev>"),
 		AllowedOrigins: getEnv("ALLOWED_ORIGINS", "*"),
 	}
 }

@@ -12,7 +12,7 @@ BodyMetrics, kullanıcıların boy, kilo ve BMI gibi sağlık metriklerini takip
 - **MySQL 8.0** — Veritabanı
 - **gorilla/mux** — HTTP router
 - **golang-jwt** — JWT authentication (HS256)
-- **net/smtp** — E-posta gönderimi (standart kütüphane, sıfır bağımlılık)
+- **Resend** — E-posta gönderimi (HTTP API)
 - **Docker** — Containerization
 
 ## Proje Yapısı
@@ -39,7 +39,7 @@ body-metrics-backend/
 │   │   ├── metric_repo.go               # Metric CRUD
 │   │   └── reset_token_repo.go          # Password reset token CRUD
 │   ├── service/
-│   │   └── email_service.go             # SMTP e-posta gönderimi (Gmail STARTTLS)
+│   │   └── email_service.go             # Resend HTTP API ile e-posta gönderimi
 │   ├── handler/
 │   │   ├── auth_handler.go              # register, login, forgot-password, reset-password
 │   │   ├── user_handler.go              # /users endpoint'leri
@@ -142,7 +142,7 @@ Request → CORSMiddleware → SecurityHeaders → MaxBytesReader(1MB) → APIKe
 ### Şifremi Unuttum Akışı
 1. `POST /auth/forgot-password` → account bulunsa da bulunmasa da `200 OK` döner (e-posta enumeration koruması)
 2. Arka planda `crypto/rand` ile 6 haneli OTP üretilir, DB'ye yazılır (15 dk TTL)
-3. Gmail SMTP/STARTTLS üzerinden OTP gönderilir
+3. Resend HTTP API üzerinden OTP gönderilir
 4. `POST /auth/reset-password` → OTP doğrulanır → bcrypt hash → şifre güncellenir → token kullanıldı işaretlenir
 
 ## Kurulum
@@ -151,7 +151,7 @@ Request → CORSMiddleware → SecurityHeaders → MaxBytesReader(1MB) → APIKe
 
 ```bash
 cp .env.example .env
-# .env dosyasındaki değerleri doldur (JWT_SECRET, SMTP_* vb.)
+# .env dosyasındaki değerleri doldur (JWT_SECRET, RESEND_API_KEY vb.)
 
 docker compose up -d
 ```
@@ -180,11 +180,8 @@ go run ./cmd/server
 | `JWT_SECRET` | — | JWT imzalama anahtarı **(zorunlu)** |
 | `API_KEY` | — | API key (boş = devre dışı) |
 | `PORT` | `8080` | Sunucu portu |
-| `SMTP_HOST` | `smtp.gmail.com` | SMTP sunucu |
-| `SMTP_PORT` | `587` | SMTP port (STARTTLS) |
-| `SMTP_USER` | — | Gmail adresi |
-| `SMTP_PASS` | — | Gmail App Password |
-| `SMTP_FROM` | — | Gönderen adı ve adresi |
+| `RESEND_API_KEY` | — | Resend API anahtarı |
+| `EMAIL_FROM` | `BodyMetrics <onboarding@resend.dev>` | Gönderen adı ve adresi |
 | `ALLOWED_ORIGINS` | `*` | CORS izin verilen origin'ler |
 
 ## Railway Deployment
@@ -192,17 +189,14 @@ go run ./cmd/server
 Railway dashboard → proje → **Variables** sekmesine aşağıdakileri ekle:
 
 ```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-gmail-app-password
-SMTP_FROM=BodyMetrics <your-email@gmail.com>
+RESEND_API_KEY=re_your_resend_api_key
+EMAIL_FROM=BodyMetrics <onboarding@resend.dev>
 ALLOWED_ORIGINS=*
 ```
 
-Deploy tetiklendiğinde `003_create_password_reset_tokens` migration'ı otomatik çalışır.
+Deploy tetiklendiğinde migration'lar otomatik çalışır.
 
-> **Gmail App Password:** Google Account → Security → 2-Step Verification → App Passwords
+> **Resend:** resend.com → API Keys → Create API Key
 
 ## Migration Sistemi
 

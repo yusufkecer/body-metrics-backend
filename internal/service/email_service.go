@@ -1,106 +1,54 @@
 package service
 
 import (
-	"crypto/tls"
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"net/smtp"
+	"io"
+	"net/http"
 )
 
 type EmailService struct {
-	host string
-	port string
-	user string
-	pass string
-	from string
+	apiKey string
+	from   string
 }
 
-func NewEmailService(host, port, user, pass, from string) *EmailService {
-	return &EmailService{host: host, port: port, user: user, pass: pass, from: from}
+func NewEmailService(apiKey, from string) *EmailService {
+	return &EmailService{apiKey: apiKey, from: from}
 }
 
 func (s *EmailService) SendPasswordReset(to, token string) error {
-	subject := "BodyMetrics - Şifre Sıfırlama Kodu"
-	body := buildResetEmail(to, token)
-
-	msg := []byte(
-		"From: " + s.from + "\r\n" +
-			"To: " + to + "\r\n" +
-			"Subject: " + subject + "\r\n" +
-			"MIME-Version: 1.0\r\n" +
-			"Content-Type: text/html; charset=UTF-8\r\n" +
-			"\r\n" +
-			body,
-	)
-
-	addr := s.host + ":" + s.port
-	auth := smtp.PlainAuth("", s.user, s.pass, s.host)
-
-	tlsConfig := &tls.Config{
-		ServerName: s.host,
+	payload := map[string]interface{}{
+		"from":    s.from,
+		"to":      []string{to},
+		"subject": "BodyMetrics - Şifre Sıfırlama Kodu",
+		"html":    buildResetEmail(to, token),
 	}
 
-	conn, err := tls.Dial("tcp", s.host+":465", tlsConfig)
+	body, err := json.Marshal(payload)
 	if err != nil {
-		// Fallback to STARTTLS on port 587
-		return s.sendSTARTTLS(addr, auth, msg, to)
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
-	defer conn.Close()
 
-	client, err := smtp.NewClient(conn, s.host)
+	req, err := http.NewRequest("POST", "https://api.resend.com/emails", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("failed to create smtp client: %w", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
-	defer client.Close()
+	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+	req.Header.Set("Content-Type", "application/json")
 
-	if err := client.Auth(auth); err != nil {
-		return fmt.Errorf("smtp auth failed: %w", err)
-	}
-	if err := client.Mail(s.user); err != nil {
-		return fmt.Errorf("smtp mail from failed: %w", err)
-	}
-	if err := client.Rcpt(to); err != nil {
-		return fmt.Errorf("smtp rcpt failed: %w", err)
-	}
-	wc, err := client.Data()
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("smtp data failed: %w", err)
+		return fmt.Errorf("resend http error: %w", err)
 	}
-	_, err = wc.Write(msg)
-	if err != nil {
-		return fmt.Errorf("smtp write failed: %w", err)
-	}
-	return wc.Close()
-}
+	defer resp.Body.Close()
 
-func (s *EmailService) sendSTARTTLS(addr string, auth smtp.Auth, msg []byte, to string) error {
-	client, err := smtp.Dial(addr)
-	if err != nil {
-		return fmt.Errorf("failed to dial smtp: %w", err)
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("resend api error %d: %s", resp.StatusCode, string(respBody))
 	}
-	defer client.Close()
 
-	tlsConfig := &tls.Config{ServerName: s.host}
-	if err := client.StartTLS(tlsConfig); err != nil {
-		return fmt.Errorf("starttls failed: %w", err)
-	}
-	if err := client.Auth(auth); err != nil {
-		return fmt.Errorf("smtp auth failed: %w", err)
-	}
-	if err := client.Mail(s.user); err != nil {
-		return fmt.Errorf("smtp mail from failed: %w", err)
-	}
-	if err := client.Rcpt(to); err != nil {
-		return fmt.Errorf("smtp rcpt failed: %w", err)
-	}
-	wc, err := client.Data()
-	if err != nil {
-		return fmt.Errorf("smtp data failed: %w", err)
-	}
-	_, err = wc.Write(msg)
-	if err != nil {
-		return fmt.Errorf("smtp write failed: %w", err)
-	}
-	return wc.Close()
+	return nil
 }
 
 func buildResetEmail(to, token string) string {

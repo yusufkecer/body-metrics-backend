@@ -171,7 +171,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 		log.Printf("[forgot-password] sending reset email to %s", email)
 		if err := h.emailService.SendPasswordReset(email, otp); err != nil {
-			log.Printf("[forgot-password] SMTP error sending to %s: %v", email, err)
+			log.Printf("[forgot-password] email error sending to %s: %v", email, err)
 			return
 		}
 		log.Printf("[forgot-password] reset email sent successfully to %s", email)
