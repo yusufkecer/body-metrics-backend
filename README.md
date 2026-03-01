@@ -1,230 +1,185 @@
-# Body Metrics Backend
+# BodyMetrics Backend API
 
-BodyMetrics Flutter uygulamasının REST API backend servisi. Go ile yazılmış, MySQL veritabanı kullanan, Docker ile deploy edilebilen hafif bir API.
+Go + MySQL REST API for the BodyMetrics mobile app.  
+BodyMetrics mobil uygulamasi icin Go + MySQL tabanli REST API servisi.
 
-## Proje Amacı
+## 🚀 Project Overview / Proje Ozeti
 
-BodyMetrics, kullanıcıların boy, kilo ve BMI gibi sağlık metriklerini takip ettiği bir mobil uygulamadır. Bu backend servisi, kullanıcı ve ölçüm verilerini merkezi bir veritabanında saklar ve Flutter uygulamasına REST API üzerinden sunar.
+**EN:** This service handles authentication, user profiles, and body metric history for the Flutter app.  
+**TR:** Bu servis Flutter uygulamasi icin kimlik dogrulama, kullanici profili ve vucut metrik gecmisini yonetir.
 
-## Teknolojiler
+## ✨ Core Features / Temel Ozellikler
 
-- **Go 1.23** — API servisi
-- **MySQL 8.0** — Veritabanı
-- **gorilla/mux** — HTTP router
-- **golang-jwt** — JWT authentication (HS256)
-- **Resend** — E-posta gönderimi (HTTP API)
-- **Docker** — Containerization
+- 🔐 **Auth (JWT):** Register, login, password reset with OTP  
+  Kayit, giris ve OTP ile sifre sifirlama
+- 🧾 **User Profile API:** Create, list, read, update user profiles  
+  Profil olusturma, listeleme, detay ve guncelleme
+- 📈 **Metric API:** Save and fetch weight/BMI measurements  
+  Kilo/BMI olcumlerini kaydetme ve listeleme
+- 🛡️ **App Security:** API key middleware, JWT middleware, security headers  
+  API key, JWT ve guvenlik header katmanlari
+- ⏱️ **Rate Limiting:** Login and forgot-password throttling  
+  Giris ve sifremi unuttum endpointleri icin limit
+- 🗃️ **Auto Migrations:** Versioned DB migrations on startup  
+  Uygulama acilisinda versiyonlu migration calistirma
 
-## Proje Yapısı
+## 🧱 Tech Stack / Teknoloji Yigini
 
-```
+- **Go 1.23**
+- **MySQL 8.0**
+- **gorilla/mux**
+- **golang-jwt (HS256)**
+- **Resend HTTP API** (email sending / e-posta gonderimi)
+- **Docker + docker compose**
+
+## 🗂️ Project Structure / Proje Yapisi
+
+```text
 body-metrics-backend/
 ├── cmd/
 │   └── server/
-│       └── main.go                      # Entry point, router ve DI kurulumu
+│       └── main.go                 # Entry point / Giris noktasi
 ├── internal/
 │   ├── config/
-│   │   └── config.go                    # Environment değişkenlerinden config okuma
+│   │   └── config.go              # Env config / Ortam degiskenleri
 │   ├── db/
-│   │   ├── mysql.go                     # MySQL connection pool
-│   │   └── migration.go                 # Otomatik migration sistemi (versiyonlu, transaction'lı)
-│   ├── domain/
-│   │   ├── user.go                      # User struct
-│   │   ├── metric.go                    # UserMetric struct
-│   │   ├── auth.go                      # Token request/response struct'ları
-│   │   └── password_reset.go            # ForgotPasswordRequest, ResetPasswordRequest, PasswordResetToken
-│   ├── repository/
-│   │   ├── account_repo.go              # Account CRUD (email + password_hash + UpdatePassword)
-│   │   ├── user_repo.go                 # User CRUD
-│   │   ├── metric_repo.go               # Metric CRUD
-│   │   └── reset_token_repo.go          # Password reset token CRUD
-│   ├── service/
-│   │   └── email_service.go             # Resend HTTP API ile e-posta gönderimi
-│   ├── handler/
-│   │   ├── auth_handler.go              # register, login, forgot-password, reset-password
-│   │   ├── user_handler.go              # /users endpoint'leri
-│   │   ├── metric_handler.go            # /users/:id/metrics endpoint'leri
-│   │   └── response.go                  # JSON response helper'ları
-│   └── middleware/
-│       ├── auth.go                      # JWT doğrulama middleware'i + token üretimi
-│       ├── apikey.go                    # API key middleware'i
-│       ├── ratelimit.go                 # Sliding window rate limiter (in-memory, sync.Map)
-│       └── security.go                  # Security headers + CORS middleware
-├── docker-compose.yml                   # MySQL + API + PhpMyAdmin
-├── Dockerfile                           # Multi-stage build (golang:1.23-alpine → alpine:3.20)
-├── .env.example                         # Örnek environment değişkenleri
+│   │   ├── mysql.go               # DB connection pool
+│   │   └── migration.go           # Versioned migrations
+│   ├── domain/                    # DTO + entities
+│   ├── repository/                # SQL layer
+│   ├── handler/                   # HTTP handlers
+│   ├── middleware/                # Auth, API key, rate limit, CORS, headers
+│   └── service/
+│       └── email_service.go       # Resend integration
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
 ├── go.mod
 └── go.sum
 ```
 
-## API Endpoint'leri
+## 🔌 API Overview / API Ozeti
 
-| Method | Path | Rate Limit | Auth | Açıklama |
-|--------|------|-----------|------|----------|
-| `GET` | `/api/v1/health` | — | — | Sağlık kontrolü |
-| `POST` | `/api/v1/auth/register` | — | API Key | Hesap oluştur → JWT döner |
-| `POST` | `/api/v1/auth/login` | 5 istek / 15 dk | API Key | Giriş yap → JWT döner |
-| `POST` | `/api/v1/auth/forgot-password` | 3 istek / 60 dk | API Key | 6 haneli OTP e-posta gönder |
-| `POST` | `/api/v1/auth/reset-password` | — | API Key | OTP + yeni şifre ile sıfırla |
-| `POST` | `/api/v1/users` | — | JWT | Yeni kullanıcı oluştur |
-| `GET` | `/api/v1/users` | — | JWT | Tüm kullanıcıları listele |
-| `GET` | `/api/v1/users/:id` | — | JWT | Kullanıcı detayı |
-| `PATCH` | `/api/v1/users/:id` | — | JWT | Kullanıcı güncelle |
-| `POST` | `/api/v1/users/:id/metrics` | — | JWT | Yeni ölçüm ekle |
-| `GET` | `/api/v1/users/:id/metrics` | — | JWT | Tüm ölçümleri getir |
+**Base Path:** `/api/v1`
 
-## Veritabanı Şeması
+### Endpoint Matrix / Endpoint Matrisi
 
-### accounts
-| Kolon | Tip | Açıklama |
-|-------|-----|----------|
-| id | BIGINT (PK) | Auto increment |
-| email | VARCHAR(255) | Benzersiz e-posta |
-| password_hash | VARCHAR(255) | bcrypt hash |
-| created_at | DATETIME | Oluşturma zamanı |
-| updated_at | DATETIME | Güncelleme zamanı |
+| Method | Path | Rate Limit | Auth | EN / TR |
+|---|---|---|---|---|
+| GET | `/health` | - | - | Health check / Saglik kontrolu |
+| POST | `/auth/register` | - | API Key | Register and return JWT / Kayit olup JWT doner |
+| POST | `/auth/login` | 5 req / 15 min | API Key | Login and return JWT / Giris yapip JWT doner |
+| POST | `/auth/forgot-password` | 3 req / 60 min | API Key | Send OTP mail / OTP e-postasi gonderir |
+| POST | `/auth/reset-password` | - | API Key | Reset password by OTP / OTP ile sifre sifirlar |
+| POST | `/users` | - | API Key + JWT | Create profile / Profil olusturur |
+| GET | `/users` | - | API Key + JWT | List profiles / Profilleri listeler |
+| GET | `/users/{id}` | - | API Key + JWT | Get profile detail / Profil detayi |
+| PATCH | `/users/{id}` | - | API Key + JWT | Partial profile update / Kismi profil guncelleme |
+| POST | `/users/{id}/metrics` | - | API Key + JWT | Add metric / Olcum ekler |
+| GET | `/users/{id}/metrics` | - | API Key + JWT | List user metrics / Kullanici olcumleri |
 
-### password_reset_tokens
-| Kolon | Tip | Açıklama |
-|-------|-----|----------|
-| id | BIGINT (PK) | Auto increment |
-| account_id | BIGINT (FK) | accounts.id referansı |
-| token | VARCHAR(6) | 6 haneli OTP (crypto/rand) |
-| expires_at | DATETIME | Son geçerlilik tarihi (15 dk) |
-| used | TINYINT(1) | Kullanılmış mı? |
-| created_at | DATETIME | Oluşturma zamanı |
+## 🗄️ Database Schema / Veritabani Semasi
 
-### users
-| Kolon | Tip | Açıklama |
-|-------|-----|----------|
-| id | BIGINT (PK) | Auto increment |
-| name | VARCHAR(100) | Ad |
-| surname | VARCHAR(100) | Soyad |
-| gender | TINYINT | 0=erkek, 1=kadın |
-| avatar | VARCHAR(50) | Profil resmi (pr1, pr2, ...) |
-| height | INT | Boy (cm) |
-| birth_of_date | VARCHAR(20) | Doğum tarihi |
-| created_at | DATETIME | Oluşturma zamanı |
-| updated_at | DATETIME | Güncelleme zamanı |
+### `accounts`
+- `id` (PK), `email` (unique), `password_hash`, `created_at`, `updated_at`
 
-### user_metrics
-| Kolon | Tip | Açıklama |
-|-------|-----|----------|
-| id | BIGINT (PK) | Auto increment |
-| user_id | BIGINT (FK) | users.id referansı |
-| date | VARCHAR(20) | Tarih (dd-MM-yyyy, legacy) |
-| weight | DOUBLE | Kilo (kg) |
-| height | INT | Boy (cm) |
-| bmi | DOUBLE | BMI değeri |
-| weight_diff | DOUBLE | Önceki ölçümle fark |
-| body_metric | VARCHAR(30) | BMI kategorisi |
-| created_at | VARCHAR(30) | ISO8601 canonical timestamp |
+### `password_reset_tokens`
+- `id` (PK), `account_id` (FK), `token`, `expires_at`, `used`, `created_at`
 
-## Güvenlik
+### `users`
+- `id` (PK), `name`, `surname`, `gender`, `avatar`, `height`, `birth_of_date`, `created_at`, `updated_at`
 
-### Middleware Zinciri
-```
-Request → CORSMiddleware → SecurityHeaders → MaxBytesReader(1MB) → APIKeyMiddleware → ...
+### `user_metrics`
+- `id` (PK), `user_id` (FK), `date`, `weight`, `height`, `bmi`, `weight_diff`, `body_metric`, `created_at`
+
+## 🛡️ Security Model / Guvenlik Modeli
+
+### Middleware Chain / Middleware Zinciri
+
+```text
+Request -> CORS -> SecurityHeaders -> MaxBytesReader(1MB) -> APIKey -> (JWT for protected routes)
 ```
 
-### Security Headers (her response'a eklenir)
+### Security Headers / Guvenlik Headerlari
+
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
 
-### Rate Limiting
-- Login: IP başına **5 istek / 15 dakika**
-- Forgot Password: IP başına **3 istek / 60 dakika**
-- In-memory sliding window, `sync.Map` tabanlı, sıfır bağımlılık
+### Password Reset Flow / Sifre Sifirlama Akisi
 
-### Şifremi Unuttum Akışı
-1. `POST /auth/forgot-password` → account bulunsa da bulunmasa da `200 OK` döner (e-posta enumeration koruması)
-2. Arka planda `crypto/rand` ile 6 haneli OTP üretilir, DB'ye yazılır (15 dk TTL)
-3. Resend HTTP API üzerinden OTP gönderilir
-4. `POST /auth/reset-password` → OTP doğrulanır → bcrypt hash → şifre güncellenir → token kullanıldı işaretlenir
+1. `POST /auth/forgot-password` always returns success-style response  
+   E-posta var/yok bilgisini ifsa etmez
+2. Secure 6-digit OTP is generated and stored with TTL  
+   Guvenli 6 haneli OTP uretilir ve sureli kaydedilir
+3. OTP email is sent via Resend  
+   OTP Resend ile e-posta olarak gonderilir
+4. `POST /auth/reset-password` validates token and updates password hash  
+   Token dogrulanir ve sifre hash guncellenir
 
-## Kurulum
+## ⚙️ Setup / Kurulum
 
-### Docker ile (Önerilen)
+### Docker (Recommended / Onerilen)
 
 ```bash
 cp .env.example .env
-# .env dosyasındaki değerleri doldur (JWT_SECRET, RESEND_API_KEY vb.)
-
+# Fill env values / Degerleri doldur
 docker compose up -d
 ```
 
-API `http://localhost:8080` adresinde çalışmaya başlar.
+API: `http://localhost:8080`
 
-### Manuel
+### Local Run / Lokal Calistirma
 
 ```bash
-# MySQL çalışıyor olmalı
 cp .env.example .env
-# .env dosyasını düzenle
-
+# MySQL must be running / MySQL calisir olmali
 go run ./cmd/server
 ```
 
-## Environment Değişkenleri
+## 🌍 Environment Variables / Ortam Degiskenleri
 
-| Değişken | Varsayılan | Açıklama |
-|----------|-----------|----------|
+| Variable | Default | Description (EN / TR) |
+|---|---|---|
 | `DB_HOST` | `localhost` | MySQL host |
 | `DB_PORT` | `3306` | MySQL port |
-| `DB_USER` | `bodymetrics` | MySQL kullanıcı |
-| `DB_PASSWORD` | `bodymetrics_pass` | MySQL şifre |
-| `DB_NAME` | `bodymetrics` | Veritabanı adı |
-| `JWT_SECRET` | — | JWT imzalama anahtarı **(zorunlu)** |
-| `API_KEY` | — | API key (boş = devre dışı) |
-| `PORT` | `8080` | Sunucu portu |
-| `RESEND_API_KEY` | — | Resend API anahtarı |
-| `EMAIL_FROM` | `BodyMetrics <noreply@send.bodymetrics.life>` | Gönderen adı ve adresi |
-| `ALLOWED_ORIGINS` | `*` | CORS izin verilen origin'ler |
+| `DB_USER` | `bodymetrics` | MySQL user |
+| `DB_PASSWORD` | `bodymetrics_pass` | MySQL password |
+| `DB_NAME` | `bodymetrics` | Database name |
+| `JWT_SECRET` | - | JWT secret (required / zorunlu) |
+| `API_KEY` | - | App-level API key (empty disables check / bos ise kontrol kapali) |
+| `PORT` | `8080` | API port |
+| `RESEND_API_KEY` | - | Resend API key |
+| `EMAIL_FROM` | `BodyMetrics <noreply@send.bodymetrics.life>` | Sender identity / Gonderen bilgisi |
+| `ALLOWED_ORIGINS` | `*` | CORS allowed origins |
 
-## Production Deployment
+## ☁️ Production Notes / Production Notlari
 
-### Domain
+- **Production Base URL:** `https://api.bodymetrics.life/api/v1`
+- **Hosting:** Railway
+- **DNS:** Namecheap (CNAME + SPF + DKIM + DMARC)
+- **TLS:** Managed by Railway
 
-Production API: **`https://api.bodymetrics.life/api/v1`**
+## 🔄 Migration System / Migration Sistemi
 
-Backend Railway üzerinde deploy edilmiş, custom domain bağlanmıştır.
+**EN:** Migrations are defined in `internal/db/migration.go` and run automatically at startup in order.  
+**TR:** Migrationlar `internal/db/migration.go` icinde tanimlidir ve uygulama acilisinda sirali olarak otomatik calisir.
 
-### DNS Kayıtları (Namecheap)
+To add a migration / Yeni migration eklemek icin:
+1. Add next version entry (e.g. `004_...`) to migrations list.
+2. Keep SQL idempotent when possible.
+3. Restart service and verify `schema_migrations`.
 
-| Tip | Host | Değer | Açıklama |
-|-----|------|-------|----------|
-| CNAME | `api` | `<railway-domain>.railway.app` | API custom domain |
-| TXT | `@` | `v=spf1 include:resend.dev ~all` | E-posta SPF kaydı |
-| TXT | `resend._domainkey` | `p=...` (Resend DKIM) | E-posta DKIM kaydı |
-| TXT | `_dmarc` | `v=DMARC1; p=none;` | E-posta DMARC kaydı |
+## 🧭 next_step
 
-Railway custom domain ekleme: Dashboard → Servis → **Settings → Networking → Custom Domain** → `api.bodymetrics.life`
-
-SSL/HTTPS sertifikası Railway tarafından otomatik yönetilir.
-
-### E-posta (Resend)
-
-`bodymetrics.life` domain'i Resend'e eklenmiş ve doğrulanmıştır. Şifremi unuttum mailleri `noreply@send.bodymetrics.life` adresinden gönderilmektedir.
-
-Resend domain yönetimi: resend.com → **Domains**
-
-### Railway Environment Variables
-
-Railway dashboard → proje → **Variables** sekmesindeki değerler:
-
-```
-RESEND_API_KEY=re_...
-EMAIL_FROM=BodyMetrics <noreply@send.bodymetrics.life>
-ALLOWED_ORIGINS=*
-```
-
-Deploy tetiklendiğinde migration'lar otomatik çalışır.
-
-## Migration Sistemi
-
-Migration'lar `internal/db/migration.go` dosyasındaki `migrations` slice'ında tanımlıdır. Sunucu her başladığında uygulanmamış migration'ları sırayla transaction içinde çalıştırır. Hata olursa rollback yapılır ve sunucu durur.
-
-Yeni migration eklemek için `004_...` versiyonlu yeni bir struct eklemek yeterlidir.
+1. **Tenant isolation (critical):** add `account_id` relation to `users`, scope all user/metric queries by token account.
+2. **IDOR protection:** enforce ownership checks for `/users/{id}` and `/users/{id}/metrics`.
+3. **Password reset replay fix:** mark reset token as used immediately after successful password update.
+4. **Rate-limit hardening:** trust `X-Forwarded-For` only behind trusted proxy; otherwise use `RemoteAddr`.
+5. **HTTP timeouts:** move to explicit `http.Server` with read/write/idle timeouts.
+6. **CORS hardening:** replace wildcard origins in production with strict allow-list.
+7. **Validation hardening:** central validator for email/password policy.
+8. **Safe logging:** mask PII and avoid sensitive payload logs.
+9. **Authorization tests:** add integration tests for cross-account access attempts.
