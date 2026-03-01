@@ -181,22 +181,47 @@ go run ./cmd/server
 | `API_KEY` | — | API key (boş = devre dışı) |
 | `PORT` | `8080` | Sunucu portu |
 | `RESEND_API_KEY` | — | Resend API anahtarı |
-| `EMAIL_FROM` | `BodyMetrics <onboarding@resend.dev>` | Gönderen adı ve adresi |
+| `EMAIL_FROM` | `BodyMetrics <noreply@send.bodymetrics.life>` | Gönderen adı ve adresi |
 | `ALLOWED_ORIGINS` | `*` | CORS izin verilen origin'ler |
 
-## Railway Deployment
+## Production Deployment
 
-Railway dashboard → proje → **Variables** sekmesine aşağıdakileri ekle:
+### Domain
+
+Production API: **`https://api.bodymetrics.life/api/v1`**
+
+Backend Railway üzerinde deploy edilmiş, custom domain bağlanmıştır.
+
+### DNS Kayıtları (Namecheap)
+
+| Tip | Host | Değer | Açıklama |
+|-----|------|-------|----------|
+| CNAME | `api` | `<railway-domain>.railway.app` | API custom domain |
+| TXT | `@` | `v=spf1 include:resend.dev ~all` | E-posta SPF kaydı |
+| TXT | `resend._domainkey` | `p=...` (Resend DKIM) | E-posta DKIM kaydı |
+| TXT | `_dmarc` | `v=DMARC1; p=none;` | E-posta DMARC kaydı |
+
+Railway custom domain ekleme: Dashboard → Servis → **Settings → Networking → Custom Domain** → `api.bodymetrics.life`
+
+SSL/HTTPS sertifikası Railway tarafından otomatik yönetilir.
+
+### E-posta (Resend)
+
+`bodymetrics.life` domain'i Resend'e eklenmiş ve doğrulanmıştır. Şifremi unuttum mailleri `noreply@send.bodymetrics.life` adresinden gönderilmektedir.
+
+Resend domain yönetimi: resend.com → **Domains**
+
+### Railway Environment Variables
+
+Railway dashboard → proje → **Variables** sekmesindeki değerler:
 
 ```
-RESEND_API_KEY=re_your_resend_api_key
-EMAIL_FROM=BodyMetrics <onboarding@resend.dev>
+RESEND_API_KEY=re_...
+EMAIL_FROM=BodyMetrics <noreply@send.bodymetrics.life>
 ALLOWED_ORIGINS=*
 ```
 
 Deploy tetiklendiğinde migration'lar otomatik çalışır.
-
-> **Resend:** resend.com → API Keys → Create API Key
 
 ## Migration Sistemi
 

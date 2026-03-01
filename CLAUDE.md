@@ -258,12 +258,54 @@ File: `internal/db/migration.go`
 | `API_KEY` | — | API key for app-level auth (empty = disabled) |
 | `PORT` | `8080` | API server port |
 | `RESEND_API_KEY` | — | Resend API key for email sending |
-| `EMAIL_FROM` | `BodyMetrics <onboarding@resend.dev>` | Sender name + address |
+| `EMAIL_FROM` | `BodyMetrics <noreply@send.bodymetrics.life>` | Sender name + address |
 | `ALLOWED_ORIGINS` | `*` | CORS allowed origins (comma-separated or `*`) |
 
 ---
 
-## 8) Docker Setup
+## 8) Production Infrastructure
+
+### Deployment Platform
+
+**Railway** — auto-deploys on push to main branch via Dockerfile.
+
+### Production URL
+
+```
+https://api.bodymetrics.life/api/v1
+```
+
+### Domain & DNS (Namecheap)
+
+| Type | Host | Value | Purpose |
+|------|------|-------|---------|
+| CNAME | `api` | `<railway-service>.railway.app` | API custom domain → Railway |
+| TXT | `@` | `v=spf1 include:resend.dev ~all` | Email SPF record |
+| TXT | `resend._domainkey` | `p=...` (from Resend dashboard) | Email DKIM record |
+| TXT | `_dmarc` | `v=DMARC1; p=none;` | Email DMARC record |
+
+- Custom domain registered in Railway: **Settings → Networking → Custom Domain → `api.bodymetrics.life`**
+- SSL certificate is managed automatically by Railway
+
+### Email (Resend)
+
+- Domain `bodymetrics.life` is added and verified in Resend (resend.com → Domains)
+- Forgot-password OTP emails are sent from `noreply@send.bodymetrics.life`
+- SPF + DKIM + DMARC records are active in Namecheap DNS
+
+### Railway Environment Variables
+
+```
+RESEND_API_KEY=re_...
+EMAIL_FROM=BodyMetrics <noreply@send.bodymetrics.life>
+JWT_SECRET=<strong-secret>
+API_KEY=<app-level-key>
+ALLOWED_ORIGINS=*
+```
+
+---
+
+## 9) Docker Setup
 
 **Services:**
 1. **mysql** — MySQL 8.0 with health check, persistent volume
@@ -290,7 +332,7 @@ docker compose down -v
 
 ---
 
-## 9) Development Guidelines
+## 10) Development Guidelines
 
 ### Code Conventions
 - **Layered architecture:** domain → repository → handler → middleware
@@ -325,7 +367,7 @@ docker compose down -v
 
 ---
 
-## 10) Quick Debug Guide
+## 11) Quick Debug Guide
 
 ### "API returns 401 Unauthorized"
 1. Check `Authorization: Bearer <token>` header is present
@@ -353,10 +395,10 @@ docker compose down -v
 4. Check firewall allows port 8080
 
 ### "Forgot password email not arriving"
-1. Verify `RESEND_API_KEY` is set correctly in environment
+1. Verify `RESEND_API_KEY` is set correctly in Railway environment
 2. Check server logs for `[forgot-password] email error` lines
-3. Ensure `EMAIL_FROM` domain is verified in Resend dashboard (or use `onboarding@resend.dev` for testing)
-4. Without a verified domain, emails can only be sent to the Resend account's registered email
+3. `bodymetrics.life` domain is verified in Resend — `EMAIL_FROM=BodyMetrics <noreply@send.bodymetrics.life>`
+4. Verify SPF/DKIM DNS records are still active in Namecheap (resend.com → Domains → `bodymetrics.life`)
 
 ### "429 Too Many Requests"
 1. Rate limit hit: login (5/15min) or forgot-password (3/hr) per IP
@@ -365,7 +407,7 @@ docker compose down -v
 
 ---
 
-## 11) Dependency Reference
+## 12) Dependency Reference
 
 | Package | Version | Usage |
 |---------|---------|-------|
