@@ -60,7 +60,7 @@ func (r *ResetTokenRepository) MarkUsed(id int64) error {
 	return nil
 }
 
-func (r *ResetTokenRepository) DeleteExpiredByAccountID(accountID int64) error {
+func (r *ResetTokenRepository) DeleteAllByAccountID(accountID int64) error {
 	_, err := r.db.Exec(
 		`DELETE FROM password_reset_tokens WHERE account_id = ?`,
 		accountID,

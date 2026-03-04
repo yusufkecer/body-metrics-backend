@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -83,9 +87,31 @@ func main() {
 	protected.HandleFunc("/users/{id}/metrics", metricHandler.Create).Methods(http.MethodPost, http.MethodOptions)
 	protected.HandleFunc("/users/{id}/metrics", metricHandler.GetByUserID).Methods(http.MethodGet, http.MethodOptions)
 
-	addr := ":" + cfg.Port
-	log.Printf("server starting on %s", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatalf("server error: %v", err)
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("server starting on :%s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	<-quit
+	log.Println("shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("server forced to shutdown: %v", err)
+	}
+	log.Println("server stopped")
 }

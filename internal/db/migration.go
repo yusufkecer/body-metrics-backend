@@ -72,13 +72,8 @@ var migrations = []migration{
 		version: "004_link_users_to_accounts",
 		sql: `
 			ALTER TABLE users
-				ADD COLUMN account_id BIGINT UNSIGNED NULL AFTER id;
-
-			ALTER TABLE users
-				ADD CONSTRAINT fk_users_accounts_account_id
-				FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE;
-
-			ALTER TABLE users
+				ADD COLUMN account_id BIGINT UNSIGNED NULL AFTER id,
+				ADD CONSTRAINT fk_users_accounts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 				ADD UNIQUE KEY uq_users_account_id (account_id)
 		`,
 	},

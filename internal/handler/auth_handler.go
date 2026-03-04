@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -146,14 +147,14 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		account, err := h.repo.GetByEmail(email)
 		if err != nil {
-			log.Printf("[forgot-password] db error looking up %s: %v", email, err)
+			log.Printf("[forgot-password] db error looking up %s: %v", maskEmail(email), err)
 			return
 		}
 		if account == nil {
 			return
 		}
 
-		if err := h.resetTokenRepo.DeleteExpiredByAccountID(account.ID); err != nil {
+		if err := h.resetTokenRepo.DeleteAllByAccountID(account.ID); err != nil {
 			log.Printf("[forgot-password] failed to delete old tokens for account %d: %v", account.ID, err)
 		}
 
@@ -169,12 +170,12 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Printf("[forgot-password] sending reset email to %s", email)
+		log.Printf("[forgot-password] sending reset email to %s", maskEmail(email))
 		if err := h.emailService.SendPasswordReset(email, otp); err != nil {
-			log.Printf("[forgot-password] email error sending to %s: %v", email, err)
+			log.Printf("[forgot-password] email error for account %d: %v", account.ID, err)
 			return
 		}
-		log.Printf("[forgot-password] reset email sent successfully to %s", email)
+		log.Printf("[forgot-password] reset email sent for account %d", account.ID)
 	}()
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "if the email exists, a code has been sent"})
@@ -218,17 +219,25 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if err := h.resetTokenRepo.MarkUsed(resetToken.ID); err != nil {
-	// }
+	if err := h.resetTokenRepo.MarkUsed(resetToken.ID); err != nil {
+		log.Printf("[reset-password] failed to mark token as used (id=%d): %v", resetToken.ID, err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password reset successful"})
 }
 
 func generateOTP() (string, error) {
-	b := make([]byte, 3)
-	if _, err := rand.Read(b); err != nil {
+	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
 		return "", err
 	}
-	n := int(b[0])<<16 | int(b[1])<<8 | int(b[2])
-	return fmt.Sprintf("%06d", n%1000000), nil
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func maskEmail(email string) string {
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) != 2 || len(parts[0]) == 0 {
+		return "***"
+	}
+	return string(parts[0][0]) + "***@" + parts[1]
 }
