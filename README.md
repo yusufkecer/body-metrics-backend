@@ -54,12 +54,12 @@ body-metrics-backend/
 |--------|------|------|----------|
 | `POST` | `/api/v1/auth/register` | - | E-posta ve şifre ile hesap oluştur |
 | `POST` | `/api/v1/auth/login` | - | E-posta ve şifre ile giriş yap |
-| `POST` | `/api/v1/users` | JWT | Yeni kullanıcı oluştur |
-| `GET` | `/api/v1/users` | JWT | Tüm kullanıcıları listele |
-| `GET` | `/api/v1/users/:id` | JWT | Kullanıcı detayı |
-| `PATCH` | `/api/v1/users/:id` | JWT | Kullanıcı güncelle (isim, boy, cinsiyet vb.) |
-| `POST` | `/api/v1/users/:id/metrics` | JWT | Yeni ölçüm ekle (kilo, BMI, vb.) |
-| `GET` | `/api/v1/users/:id/metrics` | JWT | Kullanıcının tüm ölçümlerini getir |
+| `POST` | `/api/v1/users` | JWT | Giriş yapan hesaba bağlı kullanıcı profili oluştur |
+| `GET` | `/api/v1/users` | JWT | Giriş yapan hesaba bağlı kullanıcıları listele |
+| `GET` | `/api/v1/users/:id` | JWT | Yalnızca giriş yapan hesaba ait kullanıcı detayı |
+| `PATCH` | `/api/v1/users/:id` | JWT | Yalnızca giriş yapan hesaba ait kullanıcıyı güncelle |
+| `POST` | `/api/v1/users/:id/metrics` | JWT | Yalnızca giriş yapan hesaba ait kullanıcıya ölçüm ekle |
+| `GET` | `/api/v1/users/:id/metrics` | JWT | Yalnızca giriş yapan hesaba ait kullanıcının ölçümlerini getir |
 
 ## Veritabanı Şeması
 
@@ -67,6 +67,7 @@ body-metrics-backend/
 | Kolon | Tip | Açıklama |
 |-------|-----|----------|
 | id | BIGINT (PK) | Auto increment |
+| account_id | BIGINT (FK, UNIQUE) | accounts.id referansı (hesap-kullanıcı bağı) |
 | name | VARCHAR(100) | Ad |
 | surname | VARCHAR(100) | Soyad |
 | gender | TINYINT | 0=erkek, 1=kadın |
@@ -117,7 +118,7 @@ go run ./cmd/server
 1. Flutter uygulaması `POST /auth/register` ile hesap açar veya `POST /auth/login` ile giriş yapar
 2. API JWT token döner
 3. Sonraki tüm isteklerde `Authorization: Bearer <token>` header'ı gönderilir
-4. Token süresi: 30 gün
+4. Token süresi: süresiz (JWT içinde `exp` claim'i yok)
 
 ## Migration Sistemi
 

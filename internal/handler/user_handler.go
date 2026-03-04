@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/yusufkecer/body-metrics-backend/internal/domain"
+	"github.com/yusufkecer/body-metrics-backend/internal/middleware"
 	"github.com/yusufkecer/body-metrics-backend/internal/repository"
 )
 
@@ -19,13 +20,29 @@ func NewUserHandler(repo *repository.UserRepository) *UserHandler {
 }
 
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
+	accountID, ok := r.Context().Value(middleware.AccountIDKey).(int64)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "invalid account context")
+		return
+	}
+
+	existingUser, err := h.repo.GetByAccountID(accountID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check account user")
+		return
+	}
+	if existingUser != nil {
+		writeError(w, http.StatusConflict, "user profile already exists for this account")
+		return
+	}
+
 	var user domain.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	id, err := h.repo.Create(&user)
+	id, err := h.repo.Create(accountID, &user)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create user")
 		return
@@ -36,13 +53,19 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	accountID, ok := r.Context().Value(middleware.AccountIDKey).(int64)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "invalid account context")
+		return
+	}
+
 	id, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
 
-	user, err := h.repo.GetByID(id)
+	user, err := h.repo.GetByIDAndAccountID(id, accountID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get user")
 		return
@@ -56,7 +79,13 @@ func (h *UserHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	users, err := h.repo.GetAll()
+	accountID, ok := r.Context().Value(middleware.AccountIDKey).(int64)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "invalid account context")
+		return
+	}
+
+	users, err := h.repo.GetAllByAccountID(accountID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list users")
 		return
@@ -68,9 +97,25 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
+	accountID, ok := r.Context().Value(middleware.AccountIDKey).(int64)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "invalid account context")
+		return
+	}
+
 	id, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+
+	existingUser, err := h.repo.GetByIDAndAccountID(id, accountID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get user")
+		return
+	}
+	if existingUser == nil {
+		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
 
@@ -80,12 +125,12 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.Update(id, fields); err != nil {
+	if err := h.repo.UpdateByIDAndAccountID(id, accountID, fields); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update user")
 		return
 	}
 
-	user, err := h.repo.GetByID(id)
+	user, err := h.repo.GetByIDAndAccountID(id, accountID)
 	if err != nil || user == nil {
 		writeError(w, http.StatusInternalServerError, "failed to get updated user")
 		return
