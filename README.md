@@ -87,7 +87,7 @@ body-metrics-backend/
 - `id` (PK), `account_id` (FK), `token`, `expires_at`, `used`, `created_at`
 
 ### `users`
-- `id` (PK), `name`, `surname`, `gender`, `avatar`, `height`, `birth_of_date`, `created_at`, `updated_at`
+- `id` (PK), `account_id` (FK → accounts, UNIQUE), `name`, `surname`, `gender`, `avatar`, `height`, `birth_of_date`, `created_at`, `updated_at`
 
 ### `user_metrics`
 - `id` (PK), `user_id` (FK), `date`, `weight`, `height`, `bmi`, `weight_diff`, `body_metric`, `created_at`
@@ -174,12 +174,9 @@ To add a migration / Yeni migration eklemek icin:
 
 ## 🧭 next_step
 
-1. **Tenant isolation (critical):** add `account_id` relation to `users`, scope all user/metric queries by token account.
-2. **IDOR protection:** enforce ownership checks for `/users/{id}` and `/users/{id}/metrics`.
-3. **Password reset replay fix:** mark reset token as used immediately after successful password update.
-4. **Rate-limit hardening:** trust `X-Forwarded-For` only behind trusted proxy; otherwise use `RemoteAddr`.
-5. **HTTP timeouts:** move to explicit `http.Server` with read/write/idle timeouts.
-6. **CORS hardening:** replace wildcard origins in production with strict allow-list.
-7. **Validation hardening:** central validator for email/password policy.
-8. **Safe logging:** mask PII and avoid sensitive payload logs.
-9. **Authorization tests:** add integration tests for cross-account access attempts.
+1. **Rate-limit hardening:** trust `X-Forwarded-For` only behind trusted proxy; otherwise use `RemoteAddr`.
+2. **HTTP timeouts:** move to explicit `http.Server` with read/write/idle timeouts.
+3. **CORS hardening:** replace wildcard origins in production with strict allow-list.
+4. **Validation hardening:** central validator for email/password policy.
+5. **Safe logging:** mask PII and avoid sensitive payload logs.
+6. **Authorization tests:** add integration tests for cross-account access attempts.

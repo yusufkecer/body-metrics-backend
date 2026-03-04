@@ -17,7 +17,6 @@ func GenerateToken(accountID int64, email, secret string) (string, error) {
 	claims := jwt.MapClaims{
 		"account_id": accountID,
 		"email":      email,
-		"exp":        time.Now().Add(30 * 24 * time.Hour).Unix(),
 		"iat":        time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -46,7 +45,7 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
 				return []byte(secret), nil
 			})
 			if err != nil || !token.Valid {
-				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
+				http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
 				return
 			}
 

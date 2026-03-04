@@ -86,12 +86,12 @@ body-metrics-backend/
 ### Protected (JWT + API Key Required)
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| POST | `/users` | `UserHandler.Create` | Create user profile |
-| GET | `/users` | `UserHandler.GetAll` | List all users |
-| GET | `/users/{id}` | `UserHandler.GetByID` | Get user by ID |
-| PATCH | `/users/{id}` | `UserHandler.Update` | Partial update user fields |
-| POST | `/users/{id}/metrics` | `MetricHandler.Create` | Add health metric |
-| GET | `/users/{id}/metrics` | `MetricHandler.GetByUserID` | Get all metrics for user |
+| POST | `/users` | `UserHandler.Create` | Create user profile for authenticated account |
+| GET | `/users` | `UserHandler.GetAll` | List users for authenticated account |
+| GET | `/users/{id}` | `UserHandler.GetByID` | Get user by ID (must belong to authenticated account) |
+| PATCH | `/users/{id}` | `UserHandler.Update` | Partial update (must belong to authenticated account) |
+| POST | `/users/{id}/metrics` | `MetricHandler.Create` | Add metric (user must belong to authenticated account) |
+| GET | `/users/{id}/metrics` | `MetricHandler.GetByUserID` | List metrics (user must belong to authenticated account) |
 
 ### Response Format
 ```json
@@ -135,7 +135,9 @@ Request → CORSMiddleware → SecurityHeaders → MaxBytesReader(1MB) → APIKe
 - Header: `Authorization: Bearer <token>`
 - Applied to protected routes only
 - Algorithm: HS256, expiry: 30 days
-- Claims: `account_id`, `email`, `exp`, `iat`
+- Expiration: none (no `exp` claim)
+- Claims: `account_id`, `email`, `iat`
+- Secret stored in `JWT_SECRET` environment variable
 
 ### Password Security
 - Algorithm: bcrypt (default cost)
@@ -178,6 +180,7 @@ CREATE TABLE accounts (
 ```sql
 CREATE TABLE users (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id    BIGINT UNSIGNED UNIQUE,
     name          VARCHAR(100),
     surname       VARCHAR(100),
     gender        TINYINT,           -- 0=male, 1=female
@@ -185,7 +188,8 @@ CREATE TABLE users (
     height        INT,               -- cm
     birth_of_date VARCHAR(20),
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 )
 ```
 
@@ -371,7 +375,7 @@ docker compose down -v
 
 ### "API returns 401 Unauthorized"
 1. Check `Authorization: Bearer <token>` header is present
-2. Verify token hasn't expired (30-day TTL)
+2. Verify token signature is valid and token was signed with current `JWT_SECRET`
 3. Check `JWT_SECRET` matches between token generation and validation
 
 ### "API returns 403 Forbidden"

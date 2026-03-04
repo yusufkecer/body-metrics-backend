@@ -42,7 +42,7 @@ func main() {
 
 	authHandler := handler.NewAuthHandler(cfg.JWTSecret, accountRepo, resetTokenRepo, emailService)
 	userHandler := handler.NewUserHandler(userRepo)
-	metricHandler := handler.NewMetricHandler(metricRepo)
+	metricHandler := handler.NewMetricHandler(metricRepo, userRepo)
 
 	loginRL := middleware.NewRateLimiter(5, 15*time.Minute)
 	forgotPasswordRL := middleware.NewRateLimiter(3, 60*time.Minute)
