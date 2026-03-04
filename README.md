@@ -171,12 +171,3 @@ To add a migration / Yeni migration eklemek icin:
 1. Add next version entry (e.g. `004_...`) to migrations list.
 2. Keep SQL idempotent when possible.
 3. Restart service and verify `schema_migrations`.
-
-## 🧭 next_step
-
-1. **Rate-limit hardening:** trust `X-Forwarded-For` only behind trusted proxy; otherwise use `RemoteAddr`.
-2. **HTTP timeouts:** move to explicit `http.Server` with read/write/idle timeouts.
-3. **CORS hardening:** replace wildcard origins in production with strict allow-list.
-4. **Validation hardening:** central validator for email/password policy.
-5. **Safe logging:** mask PII and avoid sensitive payload logs.
-6. **Authorization tests:** add integration tests for cross-account access attempts.

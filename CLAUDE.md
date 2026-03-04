@@ -134,7 +134,7 @@ Request → CORSMiddleware → SecurityHeaders → MaxBytesReader(1MB) → APIKe
 **Layer 2 — JWT Token (User-Level)**
 - Header: `Authorization: Bearer <token>`
 - Applied to protected routes only
-- Algorithm: HS256, expiry: 30 days
+- Algorithm: HS256
 - Expiration: none (no `exp` claim)
 - Claims: `account_id`, `email`, `iat`
 - Secret stored in `JWT_SECRET` environment variable
