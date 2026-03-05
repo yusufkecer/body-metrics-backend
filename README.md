@@ -3,6 +3,10 @@
 Go + MySQL REST API for the BodyMetrics mobile app.  
 BodyMetrics mobil uygulamasi icin Go + MySQL tabanli REST API servisi.
 
+## Repository / Depo
+
+- Backend: [github.com/yusufkecer/body-metrics-backend](https://github.com/yusufkecer/body-metrics-backend.git)
+
 ## 🚀 Project Overview / Proje Ozeti
 
 **EN:** This service handles authentication, user profiles, and body metric history for the Flutter app.  

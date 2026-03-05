@@ -1,6 +1,15 @@
-# CLAUDE.md — BodyMetrics Backend
+# AGENTS.md — BodyMetrics Backend
 
 > This file is auto-read by Claude Code at session start. It provides AI agents with everything needed to understand, navigate, and contribute to this repository.
+
+## Repository / Depo
+
+- GitHub: https://github.com/yusufkecer/body-metrics-backend.git
+
+## Language Note / Dil Notu
+
+- EN: Keep technical definitions in English; add concise Turkish equivalents for user-facing explanations when useful.
+- TR: Teknik terimleri İngilizce koru; kullanıcıya dönük açıklamalarda gerektiğinde kısa Türkçe karşılık ekle.
 
 ---
 
