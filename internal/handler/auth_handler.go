@@ -226,6 +226,21 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "password reset successful"})
 }
 
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	accountID, ok := r.Context().Value(middleware.AccountIDKey).(int64)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "invalid account context")
+		return
+	}
+
+	if err := h.repo.Delete(accountID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete account")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "account deleted successfully"})
+}
+
 func generateOTP() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {

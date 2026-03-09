@@ -81,6 +81,7 @@ body-metrics-backend/
 | PATCH | `/users/{id}` | - | API Key + JWT | Partial profile update / Kismi profil guncelleme |
 | POST | `/users/{id}/metrics` | - | API Key + JWT | Add metric / Olcum ekler |
 | GET | `/users/{id}/metrics` | - | API Key + JWT | List user metrics / Kullanici olcumleri |
+| DELETE | `/account` | - | API Key + JWT | Delete account and all related data / Hesabi ve bagli verileri siler |
 
 ## 🗄️ Database Schema / Veritabani Semasi
 
