@@ -78,7 +78,7 @@ func main() {
 	api.Handle("/auth/reset-password", http.HandlerFunc(authHandler.ResetPassword)).Methods(http.MethodPost, http.MethodOptions)
 
 	protected := api.NewRoute().Subrouter()
-	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret, accountRepo))
 
 	protected.HandleFunc("/users", userHandler.Create).Methods(http.MethodPost, http.MethodOptions)
 	protected.HandleFunc("/users", userHandler.GetAll).Methods(http.MethodGet, http.MethodOptions)

@@ -2,8 +2,11 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 )
+
+var ErrAccountNotFound = errors.New("account not found")
 
 type Account struct {
 	ID           int64
@@ -60,44 +63,23 @@ func (r *AccountRepository) UpdatePassword(accountID int64, passwordHash string)
 	return nil
 }
 
+func (r *AccountRepository) ExistsByID(accountID int64) (bool, error) {
+	var exists int
+	err := r.db.QueryRow(
+		`SELECT 1 FROM accounts WHERE id = ? LIMIT 1`,
+		accountID,
+	).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to check account existence: %w", err)
+	}
+	return true, nil
+}
+
 func (r *AccountRepository) Delete(accountID int64) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	// Delete metrics for the user associated with this account
-	_, err = tx.Exec(
-		`DELETE um FROM user_metrics um
-		 JOIN users u ON um.user_id = u.id
-		 WHERE u.account_id = ?`,
-		accountID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to delete user metrics: %w", err)
-	}
-
-	// Delete user profiles associated with this account
-	_, err = tx.Exec(
-		`DELETE FROM users WHERE account_id = ?`,
-		accountID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to delete users: %w", err)
-	}
-
-	// Delete password reset tokens
-	_, err = tx.Exec(
-		`DELETE FROM password_reset_tokens WHERE account_id = ?`,
-		accountID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to delete password reset tokens: %w", err)
-	}
-
-	// Delete the account
-	_, err = tx.Exec(
+	result, err := r.db.Exec(
 		`DELETE FROM accounts WHERE id = ?`,
 		accountID,
 	)
@@ -105,8 +87,12 @@ func (r *AccountRepository) Delete(accountID int64) error {
 		return fmt.Errorf("failed to delete account: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to inspect delete account result: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrAccountNotFound
 	}
 
 	return nil

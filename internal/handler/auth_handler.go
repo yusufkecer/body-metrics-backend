@@ -234,6 +234,10 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.Delete(accountID); err != nil {
+		if errors.Is(err, repository.ErrAccountNotFound) {
+			writeError(w, http.StatusNotFound, "account not found")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "failed to delete account")
 		return
 	}
