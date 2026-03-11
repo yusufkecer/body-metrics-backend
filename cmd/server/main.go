@@ -86,6 +86,7 @@ func main() {
 	protected.HandleFunc("/users/{id}", userHandler.Update).Methods(http.MethodPatch, http.MethodOptions)
 	protected.HandleFunc("/users/{id}/metrics", metricHandler.Create).Methods(http.MethodPost, http.MethodOptions)
 	protected.HandleFunc("/users/{id}/metrics", metricHandler.GetByUserID).Methods(http.MethodGet, http.MethodOptions)
+	protected.HandleFunc("/account", authHandler.DeleteAccount).Methods(http.MethodDelete, http.MethodOptions)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
